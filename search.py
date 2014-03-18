@@ -6,16 +6,9 @@ import re
 import Queue
 import string
 import nltk
+import math
 
-REGEX_STRING_ENCLOSED_BY_PARANTHESES = "(?<=\().*?(?=\))"
-DELIMITER_OR = " OR "
-DELIMITER_AND = " AND "
-PREFIX_NOT = "NOT "
-REGEX_PREFIX_NOT = "(?<=NOT ).*"
-PREFIX_PARANTHESIS = "PARANTHESIS_"
-REGEX_PREFIX_PARANTHESIS = "(?<=PARANTHESIS_).*"
 POINTER_DOCUMENTS_ALL = 0
-MAX_CACHE_SIZE=100000
 
 def get_list_of_all_doc_ids():
   return get_doc_ids_from_postings_file_at_pointer(POINTER_DOCUMENTS_ALL)
@@ -33,8 +26,11 @@ def store_entry_in_dictionary(entry):
   """
   term_pointer_list = parse_dictionary_file_entry(entry)
   term = term_pointer_list[0]
-  file_pointer = term_pointer_list[1]
-  dictionary[term] = file_pointer
+  df = term_pointer_list[1]
+  file_pointer = term_pointer_list[2]
+  dictionary[term] = {}
+  dictionary[term]['fp'] = file_pointer
+  dictionary[term]['df'] = file_pointer
 
 def store_dictionary_in_memory_and_return_it(dict_file):
   dict_file_reader = open(dict_file, 'r')
@@ -43,24 +39,10 @@ def store_dictionary_in_memory_and_return_it(dict_file):
   dict_file_reader.close()
   return dictionary
 
-def does_doc_id_contain_skip_pointer(doc_id):
-  """
-  Checks if a postings list term contains a skip pointer
-  """
-  return (',' in doc_id)
-
-def get_doc_id_from_doc_id_and_skip_pointer(doc_id):
-  doc_id_skip_pointer_list = doc_id.split(',')
-  return doc_id_skip_pointer_list[0]
-
 def get_doc_ids_from_postings_file_at_pointer(file_pointer):
   postings_file_reader = open(postings_file, "r")
-  postings_file_read_position = postings_file_reader.seek(file_pointer)
+  postings_file_reader.seek(file_pointer)
   doc_ids = postings_file_reader.readline().strip().split()
-  for i in range(0, len(doc_ids)):
-    doc_id = doc_ids[i]
-    if does_doc_id_contain_skip_pointer(doc_id):
-      doc_ids[i] = get_doc_id_from_doc_id_and_skip_pointer(doc_id)
   postings_file_reader.close()
   return doc_ids
 
@@ -81,144 +63,44 @@ def get_doc_ids_for_token(token):
   Given a token, returns all doc_ids from the postings list
   """
   doc_ids = []
-  if query in dictionary:
-    postings_file_pointer_for_query_term = int(dictionary[query])
+  token = stemmer.stem(token.lower())
+  if token in dictionary:
+    postings_file_pointer_for_query_term = int(dictionary[token]['fp'])
     doc_ids = get_doc_ids_from_postings_file_at_pointer(postings_file_pointer_for_query_term)
   return doc_ids
 
-def get_skip(posting):
-  """
-  Returns the skip pointer of this posting
-  """
-  if has_skip(posting):
-      return posting.split(",")[1]
+def compute_weight_term_with_query(term, query):
+  tf = 1 + math.log(query.count(term), 10)
+  return tf
 
-  return "-1";
-
-def has_skip(posting):
-  if posting.count(",") == 1 and posting.split(",")[1] != "-1" : return True
-  return False
-
-def merge_lists(p1, p2):
-  answer = []
-  idx1 = 0
-  idx2 = 0
-  len1, len2 = len(p1), len(p2)
-  while idx1 < len1 and idx2 < len2:
-    doc_id1 = int(p1[idx1])
-    doc_id2 = int(p2[idx2])
-    if doc_id1 == doc_id2:
-      answer.append(str(doc_id1))
-      idx1 += 1
-      idx2 += 1
-    elif doc_id1 < doc_id2:
-      idx1 += 1
-    else:
-      idx2 += 1
-  return answer
-
-def union_lists(p1, p2):
-  answer = []
-  idx1 = 0
-  idx2 = 0
-
-  while idx1 < len(p1) and idx2 < len(p2) :
-    doc_id1 = (p1[idx1])
-    doc_id2 = (p2[idx2])
-    if doc_id1 == doc_id2:
-      answer.append(doc_id1)
-      answer.append(doc_id2)
-      idx1 += 1
-      idx2 += 1
-    elif doc_id1 < doc_id2:
-      answer.append(doc_id1)
-      idx1 += 1
-
-    elif doc_id2 < doc_id1:
-      answer.append(doc_id2)
-      idx2 += 1
-  return answer
-
-def execute_and_operation(operands):
-  assert len(operands) > 1
-  list_results = perform_query(operands[0].strip())
-  for i in range(1, len(operands)):
-    list_results = merge_lists(list_results, perform_query(operands[i].strip()))
-  return list_results
-
-def execute_or_operation(operands):
-  list_results = []
-  for operand in operands:
-    list_results = union_lists(list_results, perform_query(operand.strip()))
-  return list_results
-
-def execute_not_operation(operand):
-  global all_docs
-  list_results = []
-  operand_query_results = set(perform_query(operand))
-  list_results = [doc for doc in all_docs if doc not in operand_query_results]
-  return list_results
-
-def are_there_brackets_in_expression(expr):
-  matches = re.findall(REGEX_STRING_ENCLOSED_BY_PARANTHESES, expr)
-  if len(matches) > 0:
-    return True
-
-def get_substrings_enclosed_in_brackets(str):
-  return re.findall(REGEX_STRING_ENCLOSED_BY_PARANTHESES, str)
-
-def get_index_of_bracketed_query(query):
-  matches = re.findall(REGEX_PREFIX_PARANTHESIS, query)
-  return int(matches[0])
-
-def get_expression_in_front_of_NOT(query):
-  matches = re.findall(REGEX_PREFIX_NOT, query)
-  assert len(matches) == 1
-  return matches[0]
+def compute_weight_term_with_doc(term, doc_id, tf):
+  tf = 1 + math.log(int(tf), 10)
+  df = math.log(num_docs/float(dictionary['term']['df']), 10)
+  return tf * df
 
 def perform_query(query):
   """
   Recursively evaluates query based on rank of precedence
   """
-  global list_query_parantheses_results
-  if are_there_brackets_in_expression(query):
-    list_of_expressions_in_bracket = get_substrings_enclosed_in_brackets(query)
-    for i in range(0, len(list_of_expressions_in_bracket)):
-      expression = list_of_expressions_in_bracket[i]
-      query = query.replace('(' + expression + ')', 'PARANTHESIS_' + str(i))
-      list_query_parantheses_results.append(perform_query(expression.strip()))
-    return perform_query(query)
-  elif DELIMITER_OR in query:
-    list_sub_expressions_separated_by_OR = query.split(DELIMITER_OR)
-    return execute_or_operation(list_sub_expressions_separated_by_OR)
-  elif DELIMITER_AND in query:
-    list_sub_expressions_separated_by_AND = query.split(DELIMITER_AND)
-    return execute_and_operation(list_sub_expressions_separated_by_AND)
-  elif PREFIX_NOT in query:
-    expression_to_be_negated = (get_expression_in_front_of_NOT(query)).strip()
-    return execute_not_operation(expression_to_be_negated)
-  elif PREFIX_PARANTHESIS in query:
-    index_query_in_bracket_list = get_index_of_bracketed_query(query)
-    return list_query_parantheses_results[index_query_in_bracket_list]
-  elif stemmer.stem(string.lower(query)) in dictionary:
-    postings_file_pointer_for_query_term = int(dictionary[stemmer.stem(string.lower(query))])
-    if query not in cache:
-      global current_cache_size
-      if current_cache_size > MAX_CACHE_SIZE:
-        del cache[cache.itervalues().next()]
-        current_cache_size = current_cache_size - 1
-      cache[query] = get_doc_ids_from_postings_file_at_pointer(postings_file_pointer_for_query_term)
-      current_cache_size = current_cache_size + 1
-    return cache[query]
-  else:
-    return []
+  scores = {}
+  tokens = query.split()
+  for term in tokens:
+    weight_term_with_query = compute_weight_term_with_query(term, query)
+    postings_list = get_doc_ids_for_token(term)
+    for doc_term in postings_list:
+      doc_id, tf = doc_term.split(',')
+      weight_term_with_doc = compute_weight_term_with_doc(term, doc_id, tf)
+      if doc_id not in scores:
+        scores[doc_id] = 0
+      scores[doc_id] += weight_term_with_query * weight_term_with_doc
+
+  print sorted(scores, key=scores.get, reverse=True)
+  return []
 
 def perform_queries():
   query_file_reader = open(query_file, 'r')
   postings_file_reader = open(postings_file, 'r')
   for query in query_file_reader.readlines():
-    global list_query_parantheses_results
-    list_query_parantheses_results = []
     query = query.strip()
     res = perform_query(query)
     write_to_output_file(" ".join(res))
@@ -245,10 +127,9 @@ if query_file == None or dict_file == None or postings_file == None or output_fi
   sys.exit(2)
 
 dictionary = {}
-cache = {}
-current_cache_size = 0
-list_query_parantheses_results = []
+scores = {}
 dictionary = store_dictionary_in_memory_and_return_it(dict_file)
 stemmer = nltk.stem.porter.PorterStemmer()
 all_docs = get_doc_ids_from_postings_file_at_pointer(POINTER_DOCUMENTS_ALL)
+num_docs = len(all_docs)
 perform_queries()
