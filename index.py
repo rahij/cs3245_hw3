@@ -9,6 +9,7 @@ import os.path
 import shutil
 
 TOKEN_FILES_DIR='dict_dir/'
+DOC_FILES_DIR='doc_dir/'
 NUM_FILES_TO_INDEX = 500
 
 def create_dict_dir():
@@ -17,6 +18,9 @@ def create_dict_dir():
   """
   if not os.path.exists(TOKEN_FILES_DIR):
     os.makedirs(TOKEN_FILES_DIR)
+
+def create_doc_dir():
+  os.makedirs(DOC_FILES_DIR)
 
 def stem_and_normalize_tokens(token_list):
   """
@@ -48,6 +52,14 @@ def create_term_freq(l):
     doc_id, freq = term.split(',')
     tf[doc_id] = int(freq)
   return tf
+
+def write_token_list_to_doc_file(token_list, doc_id):
+  file_path = DOC_FILES_DIR + doc_id
+  if not os.path.isfile(file_path):
+    doc_file_writer = open(file_path, "w")
+  else:
+    doc_file_writer = open(file_path, "a")
+  doc_file_writer.write(' '.join(token_list))
 
 def write_doc_id_to_file(token, doc_id):
   """
@@ -121,16 +133,20 @@ def append_all_files_to_dict():
 
 def index_docs(documents_dir, dict_file, postings_file):
   create_dict_dir()
+  create_doc_dir()
   indexer = {}
   file_list = get_list_of_files_to_index()
   for file_name in file_list:
+    all_tokens_in_doc = []
     in_file = documents_dir + file_name
     with open(in_file) as f:
       for l in f.readlines():
         token_list = get_tokens_from_line(l)
+        all_tokens_in_doc.extend(token_list)
         for token in token_list:
           write_doc_id_to_file(token, file_name)
 
+    write_token_list_to_doc_file(list(set(all_tokens_in_doc)), file_name)
   append_all_files_to_dict()
 
 def usage():
