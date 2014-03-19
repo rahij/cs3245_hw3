@@ -9,8 +9,9 @@ import os.path
 import shutil
 
 TOKEN_FILES_DIR='dict_dir/'
-DOC_FILES_DIR='doc_dir/'
-NUM_FILES_TO_INDEX = 500
+DOC_FILES_DIR = 'doc_weights/'
+NUM_FILES_TO_INDEX = -1
+LOG_BASE = 2
 
 def create_dict_dir():
   """
@@ -18,9 +19,6 @@ def create_dict_dir():
   """
   if not os.path.exists(TOKEN_FILES_DIR):
     os.makedirs(TOKEN_FILES_DIR)
-
-def create_doc_dir():
-  os.makedirs(DOC_FILES_DIR)
 
 def stem_and_normalize_tokens(token_list):
   """
@@ -53,14 +51,6 @@ def create_term_freq(l):
     tf[doc_id] = int(freq)
   return tf
 
-def write_token_list_to_doc_file(token_list, doc_id):
-  file_path = DOC_FILES_DIR + doc_id
-  if not os.path.isfile(file_path):
-    doc_file_writer = open(file_path, "w")
-  else:
-    doc_file_writer = open(file_path, "a")
-  doc_file_writer.write(' '.join(token_list))
-
 def write_doc_id_to_file(token, doc_id):
   """
   Appends doc_id to file with name as the token inside TOKEN_FILES_DIR
@@ -90,9 +80,11 @@ def get_list_of_files_to_index():
   """
   Gets list of files to be indexed in order
   """
-  return ['104', '121', '144', '209', '232', '236', '237', '246', '248', '249', '11224', '1478', '1889', '5176', '5318', '7310', '12848', '1682', '5290', '5471']
   file_list = os.listdir(documents_dir)
+  file_list = ['104', '121', '144', '209', '232', '236', '237', '246', '248', '249', '11224', '1478', '1889', '5176', '5318', '7310', '12848', '1682', '5290', '5471']
   file_list.sort(key=int)
+  global total_files
+  total_files = len(file_list)
   if NUM_FILES_TO_INDEX == -1:
     return file_list
   else:
@@ -105,13 +97,18 @@ def get_list_of_token_files():
   file_list = os.listdir(TOKEN_FILES_DIR)
   return file_list
 
-def insert_skip_pointers(l):
-  """
-  Given a string of doc_ids, inserts root(l) evenly placed skip pointers. If the length is less than 9, it doesn't add them
-  """
+def split_string_to_doc_ids(l):
   l = l.split()
   num_docs = len(l)
   return ' '.join(l), num_docs
+
+def compute_doc_weights(token, doc_ids, idf):
+  doc_ids = doc_ids.split()
+  for term in doc_ids:
+    doc_id, tf = term.split(',')
+    if doc_id not in doc_weights:
+      doc_weights[doc_id] = 0
+    doc_weights[doc_id] += math.pow(idf * float(tf), 2)
 
 def append_all_files_to_dict():
   """
@@ -121,19 +118,26 @@ def append_all_files_to_dict():
   postings_file_writer = open(postings_file, "w")
   postings_file_writer.write(" ".join(get_list_of_files_to_index()) + "\n")
   token_file_list = get_list_of_token_files()
-  for file_name in token_file_list:
-    in_file = TOKEN_FILES_DIR + file_name
+  for token_file_name in token_file_list:
+    in_file = TOKEN_FILES_DIR + token_file_name
     with open(in_file) as f:
       file_pointer = postings_file_writer.tell()
-      doc_ids, num_docs = insert_skip_pointers(f.readline())
+      doc_ids, num_docs = split_string_to_doc_ids(f.readline())
       postings_file_writer.write(doc_ids + "\n")
-      dict_file_writer.write(file_name + " " + str(num_docs) + " " + str(file_pointer) + "\n")
-
+      idf = math.log(float(total_files)/num_docs, LOG_BASE)
+      dict_file_writer.write(token_file_name + " " + str(idf) + " " + str(file_pointer) + "\n")
+      compute_doc_weights(token_file_name, doc_ids, idf)
   shutil.rmtree(TOKEN_FILES_DIR)
+
+def write_doc_weights_to_file():
+  os.makedirs(DOC_FILES_DIR)
+  for doc_id in doc_weights:
+    weight = math.pow(doc_weights[doc_id], 0.5)
+    doc_file_writer = open(DOC_FILES_DIR + doc_id, "w")
+    doc_file_writer.write(str(weight) + '\n')
 
 def index_docs(documents_dir, dict_file, postings_file):
   create_dict_dir()
-  create_doc_dir()
   indexer = {}
   file_list = get_list_of_files_to_index()
   for file_name in file_list:
@@ -146,8 +150,8 @@ def index_docs(documents_dir, dict_file, postings_file):
         for token in token_list:
           write_doc_id_to_file(token, file_name)
 
-    write_token_list_to_doc_file(list(set(all_tokens_in_doc)), file_name)
   append_all_files_to_dict()
+  write_doc_weights_to_file()
 
 def usage():
   print "usage: " + sys.argv[0] + " -i training-doc-directory -d out-file-for-dictionary -p output-file-for-postings-list"
@@ -171,4 +175,6 @@ if documents_dir == None or dict_file == None or postings_file == None:
   usage()
   sys.exit(2)
 
+total_files = 0
+doc_weights = {}
 index_docs(documents_dir, dict_file, postings_file)

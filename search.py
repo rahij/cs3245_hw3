@@ -9,6 +9,7 @@ import nltk
 import math
 
 POINTER_DOCUMENTS_ALL = 0
+LOG_BASE = 2
 
 def get_list_of_all_doc_ids():
   return get_doc_ids_from_postings_file_at_pointer(POINTER_DOCUMENTS_ALL)
@@ -32,12 +33,16 @@ def store_entry_in_dictionary(entry):
   dictionary[term]['fp'] = file_pointer
   dictionary[term]['df'] = file_pointer
 
-def store_dictionary_in_memory_and_return_it(dict_file):
+def store_dictionary_in_memory(dict_file):
   dict_file_reader = open(dict_file, 'r')
   for token in dict_file_reader.readlines():
     store_entry_in_dictionary(token)
   dict_file_reader.close()
-  return dictionary
+
+def get_list_of_doc_files():
+  file_list = os.listdir('doc_dir')
+  file_list.sort(key=int)
+  return file_list
 
 def get_doc_ids_from_postings_file_at_pointer(file_pointer):
   postings_file_reader = open(postings_file, "r")
@@ -58,25 +63,32 @@ def write_to_output_file(line):
     output_writer = open(output_file, "a")
   output_writer.write(prepend_char + line)
 
+def normalize_token(token):
+  return stemmer.stem(token.lower())
+
 def get_doc_ids_for_token(token):
   """
   Given a token, returns all doc_ids from the postings list
   """
   doc_ids = []
-  token = stemmer.stem(token.lower())
   if token in dictionary:
     postings_file_pointer_for_query_term = int(dictionary[token]['fp'])
     doc_ids = get_doc_ids_from_postings_file_at_pointer(postings_file_pointer_for_query_term)
   return doc_ids
 
 def compute_weight_term_with_query(term, query):
-  tf = 1 + math.log(query.count(term), 10)
+  tf = 1 + math.log(query.count(term), LOG_BASE)
   return tf
 
 def compute_weight_term_with_doc(term, doc_id, tf):
-  tf = 1 + math.log(int(tf), 10)
-  df = math.log(num_docs/float(dictionary['term']['df']), 10)
+  tf = 1 + math.log(int(tf), LOG_BASE)
+  df = float(dictionary[term]['df'])
   return tf * df
+
+def get_doc_weight(doc_id):
+  doc_file_reader = open('doc_weights/' +  doc_id, 'r')
+  weight = float(doc_file_reader.readline().strip())
+  return weight
 
 def perform_query(query):
   """
@@ -84,16 +96,23 @@ def perform_query(query):
   """
   scores = {}
   tokens = query.split()
+  query_weight = 0
   for term in tokens:
     weight_term_with_query = compute_weight_term_with_query(term, query)
-    postings_list = get_doc_ids_for_token(term)
+    query_weight += math.pow(weight_term_with_query, 2)
+    normalized_token = normalize_token(term)
+    postings_list = get_doc_ids_for_token(normalized_token)
     for doc_term in postings_list:
       doc_id, tf = doc_term.split(',')
-      weight_term_with_doc = compute_weight_term_with_doc(term, doc_id, tf)
+      weight_term_with_doc = compute_weight_term_with_doc(normalized_token, doc_id, tf)
       if doc_id not in scores:
         scores[doc_id] = 0
       scores[doc_id] += weight_term_with_query * weight_term_with_doc
 
+  query_weight = math.pow(query_weight, 0.5)
+  for doc_id in scores:
+    scores[doc_id] = scores[doc_id]/query_weight
+    scores[doc_id] = scores[doc_id]/get_doc_weight(doc_id)
   print sorted(scores, key=scores.get, reverse=True)
   return []
 
@@ -128,7 +147,7 @@ if query_file == None or dict_file == None or postings_file == None or output_fi
 
 dictionary = {}
 scores = {}
-dictionary = store_dictionary_in_memory_and_return_it(dict_file)
+store_dictionary_in_memory(dict_file)
 stemmer = nltk.stem.porter.PorterStemmer()
 all_docs = get_doc_ids_from_postings_file_at_pointer(POINTER_DOCUMENTS_ALL)
 num_docs = len(all_docs)
