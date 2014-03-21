@@ -1,6 +1,6 @@
 index: index.py
 	@rm -rf dict_dir 2>/dev/null || true
-	@rm -rf doc_weights 2>/dev/null || true
+	@rm -rf doc_weights.txt 2>/dev/null || true
 	python index.py -i /Users/rahij/nltk_data/corpora/reuters/training/ -d dictionary.txt -p postings.txt
 	# python index.py -i test_sample/ -d dictionary.txt -p postings.txt
 search: search.py

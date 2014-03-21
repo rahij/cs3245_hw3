@@ -9,9 +9,9 @@ import os.path
 import shutil
 
 TOKEN_FILES_DIR='dict_dir/'
-DOC_FILES_DIR = 'doc_weights/'
+DOC_WEIGHTS_FILE = 'doc_weights.txt'
 NUM_FILES_TO_INDEX = -1
-LOG_BASE = 2
+LOG_BASE = 10
 
 def create_dict_dir():
   """
@@ -39,7 +39,7 @@ def get_tokens_from_line(line):
   """
   Converts a line into tokens by sent_tokenize, word_tokenize, case folding and normalizing special characters
   """
-  token_list = map(lambda x: x.lower(),filter(lambda word: word not in ',-...:&()\"\'', [word for sent in sent_tokenize(line) for word in word_tokenize(sent)]))
+  token_list = map(lambda x: x.lower(),filter(lambda word: word not in ',-...:!$&()\"\'', [word for sent in sent_tokenize(line) for word in word_tokenize(sent)]))
   token_list = stem_and_normalize_tokens(token_list)
   return token_list
 
@@ -81,7 +81,7 @@ def get_list_of_files_to_index():
   Gets list of files to be indexed in order
   """
   file_list = os.listdir(documents_dir)
-  file_list = ['104', '121', '144', '209', '232', '236', '237', '246', '248', '249', '11224', '1478', '1889', '5176', '5318', '7310', '12848', '1682', '5290', '5471']
+  # file_list = ['104', '121', '144', '209', '232', '236', '237', '246', '248', '249', '11224', '1478', '1889', '5176', '5318', '7310', '12848', '1682', '5290', '5471']
   file_list.sort(key=int)
   global total_files
   total_files = len(file_list)
@@ -130,24 +130,26 @@ def append_all_files_to_dict():
   shutil.rmtree(TOKEN_FILES_DIR)
 
 def write_doc_weights_to_file():
-  os.makedirs(DOC_FILES_DIR)
   for doc_id in doc_weights:
     weight = math.pow(doc_weights[doc_id], 0.5)
-    doc_file_writer = open(DOC_FILES_DIR + doc_id, "w")
-    doc_file_writer.write(str(weight) + '\n')
+    if os.path.isfile(DOC_WEIGHTS_FILE):
+      doc_file_writer = open(DOC_WEIGHTS_FILE, "a")
+      doc_file_writer.write('\n' + doc_id + " " + str(weight))
+    else:
+      doc_file_writer = open(DOC_WEIGHTS_FILE, "w")
+      doc_file_writer.write(doc_id + " " + str(weight))
 
 def index_docs(documents_dir, dict_file, postings_file):
   create_dict_dir()
   indexer = {}
   file_list = get_list_of_files_to_index()
   for file_name in file_list:
-    all_tokens_in_doc = []
     in_file = documents_dir + file_name
     with open(in_file) as f:
       for l in f.readlines():
         token_list = get_tokens_from_line(l)
-        all_tokens_in_doc.extend(token_list)
         for token in token_list:
+          print file_name
           write_doc_id_to_file(token, file_name)
 
   append_all_files_to_dict()
