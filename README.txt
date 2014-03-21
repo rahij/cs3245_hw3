@@ -14,3 +14,10 @@ Sources:
 2. http://www.slideshare.net/hellangel13/cosine-tf-idfexample
 
 3. StackOverflow
+
+Attached files:
+index.py: The indexing script
+search.py: The searching script
+dictionary.txt: The dictionary file including idf and file pointers to postings list
+postings.txt: The postings file including tf for each term in doc
+doc_weights.txt: The file containinng weights for each doc_id for normalizing in the searching process
