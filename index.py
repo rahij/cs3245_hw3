@@ -144,12 +144,12 @@ def index_docs(documents_dir, dict_file, postings_file):
   indexer = {}
   file_list = get_list_of_files_to_index()
   for file_name in file_list:
+    print file_name
     in_file = documents_dir + file_name
     with open(in_file) as f:
       for l in f.readlines():
         token_list = get_tokens_from_line(l)
         for token in token_list:
-          print file_name
           write_doc_id_to_file(token, file_name)
 
   append_all_files_to_dict()
