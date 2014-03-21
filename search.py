@@ -12,9 +12,6 @@ POINTER_DOCUMENTS_ALL = 0
 LOG_BASE = 10
 DOC_WEIGHTS_FILE='doc_weights.txt'
 
-def get_list_of_all_doc_ids():
-  return get_doc_ids_from_postings_file_at_pointer(POINTER_DOCUMENTS_ALL)
-
 def usage():
   print "usage: " + sys.argv[0] + " -d dictionary-file -p postings-file -q file-of-queries -o output-file-of-results"
 
@@ -35,23 +32,27 @@ def store_entry_in_dictionary(entry):
   dictionary[term]['df'] = df
 
 def store_dictionary_in_memory(dict_file):
+  """
+  Reads from the dictionary file and stores file pointer and document frequency in memory
+  """
   dict_file_reader = open(dict_file, 'r')
   for token in dict_file_reader.readlines():
     store_entry_in_dictionary(token)
   dict_file_reader.close()
 
 def store_doc_weights_in_memory():
+  """
+  Reads the doc_weights.txt file and stores in memory, the doc_id and its weight
+  """
   doc_file_reader = open(DOC_WEIGHTS_FILE, 'r')
   for l in doc_file_reader.readlines():
     doc_id, weight = l.split()
     doc_weights[doc_id] = float(weight)
 
-def get_list_of_doc_files():
-  file_list = os.listdir('doc_dir')
-  file_list.sort(key=int)
-  return file_list
-
 def get_doc_ids_from_postings_file_at_pointer(file_pointer):
+  """
+  Retrieves postings list of doc_id that starts at position file_pointer
+  """
   postings_file_reader = open(postings_file, "r")
   postings_file_reader.seek(file_pointer)
   doc_ids = postings_file_reader.readline().strip().split()
@@ -84,15 +85,25 @@ def get_doc_ids_for_token(token):
   return doc_ids
 
 def compute_weight_term_with_query(term, query):
+  """
+  Computes the value that has to be multiplied with the term-doc weight to calculate total score
+  (no idf)
+  """
   tf = 1 + math.log(query.count(term), LOG_BASE)
   return tf
 
 def compute_weight_term_with_doc(term, doc_id, tf):
+  """
+  Computes the value has to be multiplied with the term-query weight to calculate total score
+  """
   tf = 1 + math.log(int(tf), LOG_BASE)
   df = float(dictionary[term]['df'])
   return tf * df
 
 def get_doc_weight(doc_id):
+  """
+  Returns the value of index doc_id in the pre cached dinctionary
+  """
   return doc_weights[doc_id]
 
 def perform_query(query):
@@ -118,8 +129,7 @@ def perform_query(query):
   for doc_id in scores:
     scores[doc_id] = scores[doc_id]/query_weight
     scores[doc_id] = scores[doc_id]/get_doc_weight(doc_id)
-  print sorted(scores, key=scores.get, reverse=True)[0:15]
-  return []
+  return sorted(scores, key=scores.get, reverse=True)[0:10]
 
 def perform_queries():
   query_file_reader = open(query_file, 'r')

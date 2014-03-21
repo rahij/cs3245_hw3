@@ -44,6 +44,9 @@ def get_tokens_from_line(line):
   return token_list
 
 def create_term_freq(l):
+  """
+  Splits a comma separated doc_id, term frequency pair and stores it in a dictionary to compute doc_weights.
+  """
   l = l.split()
   tf = {}
   for term in l:
@@ -81,7 +84,6 @@ def get_list_of_files_to_index():
   Gets list of files to be indexed in order
   """
   file_list = os.listdir(documents_dir)
-  # file_list = ['104', '121', '144', '209', '232', '236', '237', '246', '248', '249', '11224', '1478', '1889', '5176', '5318', '7310', '12848', '1682', '5290', '5471']
   file_list.sort(key=int)
   global total_files
   total_files = len(file_list)
@@ -98,11 +100,19 @@ def get_list_of_token_files():
   return file_list
 
 def split_string_to_doc_ids(l):
+  """
+  Splits the comma separated string of doc_ids into tokens.
+  """
   l = l.split()
   num_docs = len(l)
   return ' '.join(l), num_docs
 
 def compute_doc_weights(token, doc_ids, idf):
+  """
+  Calculates the weight of each doc_id and stores in a dictionary.
+  This is done by incrementing the dictionary of index doc_id if it is already present
+  or initialized to 0.
+  """
   doc_ids = doc_ids.split()
   for term in doc_ids:
     doc_id, tf = term.split(',')
@@ -130,6 +140,9 @@ def append_all_files_to_dict():
   shutil.rmtree(TOKEN_FILES_DIR)
 
 def write_doc_weights_to_file():
+  """
+  Writes the dictionary with weights of each doc_id to a file.
+  """
   for doc_id in doc_weights:
     weight = math.pow(doc_weights[doc_id], 0.5)
     if os.path.isfile(DOC_WEIGHTS_FILE):

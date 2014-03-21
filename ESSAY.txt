@@ -1,0 +1,9 @@
+1. We could also create a matrix of tokens and assign a score of how close they are to each other.
+
+In other words, we basically build a similar tf, idf and cosine normalization except that two terms get a score of 1 if they are next to each other.
+
+Once that is done, we process the query according to the current assignment scope and then rank the results based on the proximity score. If two words are next to each other more, they get a higher proximity score.
+
+2. The current search engine works well for long documents and short queries. This is because we don't compute idf for queries. It doesn't work well with longer queries since we aren't taking into consideration, the number of times a term appears ina  query. So ltc.ltc would probably work better for these longer queries compared to lnc.ltc since lnc.ltc doesn't take into account the frequency of a token ina  document. However it would perform better than the current ltc.lnc since the overhead is on the queries more.
+
+3. Yes, it will be. This is because news articles are generally searched by topic (eg. Abraham Lincoln Assassination) or by a range of dates or a particular date. In this case, parametric indices will be useful for searching within date ranges and zone indices will be useful for increased relevance with the topic. Even if the metadata is not uniformly applied, it is highly probable that the documents containing metadata that match the query requirements are preferred by the user more than the ones that don't.
